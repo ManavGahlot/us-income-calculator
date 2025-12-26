@@ -70,11 +70,37 @@ export default function AffordabilityCalculator({
 
     const annualSalary = parseFloat(salary.replace(/,/g, ""));
     const monthlyGross = annualSalary / 12;
-    const monthlyNet = monthlyGross * 0.78; 
+
+    // --- NEW: Better Tax Logic (Federal + FICA) ---
+    // 1. Standard Deduction (Single 2024/25) ~ $14,600
+    const taxableIncome = Math.max(0, annualSalary - 14600);
     
-    const affordableRent = monthlyGross * 0.30;
-    const isAffordable = currentRent <= affordableRent;
-    const percentOfIncome = (currentRent / monthlyGross) * 100;
+    // 2. Simplified Federal Brackets (Effective estimate)
+    let federalTax = 0;
+    if (taxableIncome > 100525) {
+        federalTax = taxableIncome * 0.22; // Quick estimate for high earners
+    } else if (taxableIncome > 47150) {
+        federalTax = taxableIncome * 0.18; // blended 12-22%
+    } else {
+        federalTax = taxableIncome * 0.11; // blended 10-12%
+    }
+
+    // 3. FICA (Social Security + Medicare) is flat 7.65%
+    const fica = annualSalary * 0.0765;
+
+    const annualNet = annualSalary - federalTax - fica;
+    const monthlyNet = annualNet / 12;
+    // ----------------------------------------------
+
+    // STRICTER RULE: Rent should be based on NET income, not GROSS
+    // The "30% Rule" usually applies to Gross, but for "Affordability" 
+    // we want to show the REAL impact on their wallet.
+    
+    const percentOfIncome = (currentRent / monthlyNet) * 100; 
+    
+    // We adjust the "Green/Red" threshold. 
+    // If rent is > 45% of TAKE HOME pay, that is dangerous.
+    const isAffordable = percentOfIncome <= 45; 
 
     return { isAffordable, percentOfIncome, monthlyNet };
   };
